@@ -101,7 +101,7 @@ final class WGToggleModel {
 	}
 
 	var canSelectProfile: Bool {
-		profiles.count > 1 && !isBusy
+		!isBusy
 	}
 
 	var versionText: String {
@@ -115,6 +115,11 @@ final class WGToggleModel {
 		}
 
 		return "Profile: \(selectedProfileName)"
+	}
+
+	var profilesLocationText: String {
+		let count = profiles.count
+		return "\(count) profile\(count == 1 ? "" : "s") found in\n/opt/homebrew/etc/wireguard"
 	}
 
 	func refreshOnMenuOpen() {
@@ -311,19 +316,30 @@ final class WGToggleModel {
 					helperMessage = nil
 					lastErrorMessage = nil
 					activeInterfaceName = parsedStatus.interfaceName
-					if activeProfileName == nil {
-						activeProfileName = selectedProfileName
+					
+					if let liveEndpoint = parsedStatus.endpoint != Constants.unknownValue ? parsedStatus.endpoint : nil {
+						for profile in profiles {
+							let config = await fetchConfigDetails(for: profile.name)
+							if let configEndpoint = config.2, configEndpoint == liveEndpoint {
+								activeProfileName = profile.name
+								selectedProfileName = profile.name
+								break
+							}
+						}
 					}
-					if selectedProfileName == nil || !profiles.contains(where: { $0.name == selectedProfileName }) {
+					
+					if activeProfileName == nil,
+					   (selectedProfileName == nil || !profiles.contains(where: { $0.name == selectedProfileName })) {
 						selectedProfileName = activeProfileName
 					}
+					
 					connectionState = .on
 					detailLines = [
 						"Interface: \(parsedStatus.interfaceName)",
 						"Last Handshake: \(parsedStatus.lastHandshake)",
 						"Transfer: \(parsedStatus.transfer)",
 						"MTU: \(parsedStatus.mtu)",
-						"Keep-Alive: \(parsedStatus.persistentKeepalive)",
+						"Keep-alive: \(parsedStatus.persistentKeepalive)",
 						"Address: \(parsedStatus.address)",
 						"Endpoint: \(parsedStatus.endpoint)",
 						"Allowed IPs: \(parsedStatus.allowedIPs)",
@@ -466,7 +482,7 @@ final class WGToggleModel {
 			"Last Handshake: \(parsedStatus.lastHandshake)",
 			"Transfer: \(parsedStatus.transfer)",
 			"MTU: \(parsedStatus.mtu)",
-			"Keep-Alive: \(parsedStatus.persistentKeepalive)",
+			"Keep-alive: \(parsedStatus.persistentKeepalive)",
 			"Address: \(parsedStatus.address)",
 			"Endpoint: \(parsedStatus.endpoint)",
 			"Allowed IPs: \(parsedStatus.allowedIPs)",
@@ -553,13 +569,13 @@ final class WGToggleModel {
 
 		return WireGuardSnapshot(
 			interfaceName: interfaceName,
-			lastHandshake: capitalizeFirstLetter(in: handshake),
+			lastHandshake: formatTimeUnits(in: handshake),
 			transfer: transfer,
-			persistentKeepalive: capitalizeFirstLetter(in: keepalive),
+			persistentKeepalive: formatTimeUnits(in: keepalive),
 			endpoint: endpoint,
 			allowedIPs: allowedIPs,
-			address: config.address ?? details.address ?? Constants.unknownValue,
-			mtu: config.mtu ?? details.mtu ?? Constants.unknownValue
+			address: config.0 ?? details.address ?? Constants.unknownValue,
+			mtu: config.1 ?? details.mtu ?? Constants.unknownValue
 		)
 	}
 
@@ -579,7 +595,7 @@ final class WGToggleModel {
 		return (address, mtu)
 	}
 
-	private func fetchConfigDetails(for profileName: String) async -> (address: String?, mtu: String?) {
+	private func fetchConfigDetails(for profileName: String) async -> (address: String?, mtu: String?, endpoint: String?) {
 		let configPath = URL(fileURLWithPath: WGToggleHelperConstants.wireGuardConfigDirectory)
 			.appendingPathComponent(profileName)
 			.appendingPathExtension("conf")
@@ -587,26 +603,23 @@ final class WGToggleModel {
 		return await withCheckedContinuation { continuation in
 			DispatchQueue.global(qos: .userInitiated).async {
 				guard let contents = try? String(contentsOf: configPath, encoding: .utf8) else {
-					continuation.resume(returning: (nil, nil))
+					continuation.resume(returning: (nil, nil, nil))
 					return
 				}
 
-				var inInterfaceSection = false
 				var address: String?
 				var mtu: String?
+				var endpoint: String?
 
 				for rawLine in contents.components(separatedBy: .newlines) {
 					let trimmed = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
 					guard !trimmed.isEmpty, !trimmed.hasPrefix("#") else { continue }
 
 					if trimmed.hasPrefix("[") {
-						inInterfaceSection = trimmed.caseInsensitiveCompare("[Interface]") == .orderedSame
 						continue
 					}
 
-					guard inInterfaceSection,
-						  let separatorIndex = trimmed.firstIndex(of: "=")
-					else {
+					guard let separatorIndex = trimmed.firstIndex(of: "=") else {
 						continue
 					}
 
@@ -621,12 +634,14 @@ final class WGToggleModel {
 						address = value.replacingOccurrences(of: ",", with: ", ")
 					case "mtu":
 						mtu = value
+					case "endpoint":
+						endpoint = value
 					default:
 						break
 					}
 				}
 
-				continuation.resume(returning: (address, mtu))
+				continuation.resume(returning: (address, mtu, endpoint))
 			}
 		}
 	}
@@ -691,21 +706,21 @@ final class WGToggleModel {
 				"Last Handshake: -",
 				"Transfer: -",
 				"MTU: -",
-				"Keep-Alive: -",
+				"Keep-alive: -",
 				"Address: -",
 				"Endpoint: -",
 				"Allowed IPs: -",
 			]
 		} else {
 			detailLines = [
-				"Interface: Error",
+				"Interface: \(message)",
 				"Last Handshake: -",
 				"Transfer: -",
 				"MTU: -",
-				"Keep-Alive: -",
+				"Keep-alive: -",
 				"Address: -",
 				"Endpoint: -",
-				"Allowed IPs: \(message)",
+				"Allowed IPs: -",
 			]
 		}
 	}
@@ -822,8 +837,13 @@ final class WGToggleModel {
 		return String(format: "%.*f %@", decimals, value, units[unitIndex])
 	}
 
-	private func capitalizeFirstLetter(in text: String) -> String {
-		guard let firstCharacter = text.first else { return text }
-		return String(firstCharacter).uppercased() + text.dropFirst()
+	private func formatTimeUnits(in text: String) -> String {
+		var result = text
+		result = result.replacingOccurrences(of: "minutes", with: "min")
+		result = result.replacingOccurrences(of: "minute", with: "min")
+		result = result.replacingOccurrences(of: "seconds", with: "sec")
+		result = result.replacingOccurrences(of: "second", with: "sec")
+		guard let firstCharacter = result.first else { return result }
+		return String(firstCharacter).uppercased() + result.dropFirst()
 	}
 }

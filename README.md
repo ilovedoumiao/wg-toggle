@@ -13,7 +13,7 @@ WG Toggle is yet another tiny unofficial menubar utility to turn on or off your 
 
 ## Disclaimer + TOS
 
-Use this at your own risk. It works for me, but I can’t guarantee it will work as expected on your setup. By using WG Toggle, I assume no responsibility if it messes up your system.
+Use this at your own risk. It works for me, but I can't guarantee it will work as expected on your setup. By using WG Toggle, I assume no responsibility if it messes up your system.
 
 ## Getting Started
 
@@ -42,6 +42,11 @@ or
 ```bash
 git clone https://github.com/ilovedoumiao/wg-toggle.git
 ```
+1. Open the `wg-toggle.xcodeproj` project file in Xcode
+2. Product → Archive
+3. Once the build is completed, the Archives window should pop up
+4. Click on Distribute App button on the right → Custom → Copy App and Export
+5. Move the `WG Toggle.app` from the exported folder into your Applications
 
 #### Notes
 

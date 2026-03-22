@@ -28,23 +28,20 @@ struct wg_toggleApp: App {
 				Divider()
 
 				Menu(model.profileMenuTitle) {
-					Text("Found in /opt/homebrew/etc/wireguard")
-						.font(.system(size: 10))
-						.opacity(0.5)
-
-					Divider()
-
 					ForEach(model.profiles) { profile in
 						Button {
 							model.selectProfile(named: profile.name)
 						} label: {
-							if profile.name == model.selectedProfileName {
-								Label(profile.name, systemImage: "checkmark")
-							} else {
-								Text(profile.name)
-							}
+							Text(profile.name)
 						}
 					}
+					
+					Divider()
+					
+					Text(model.profilesLocationText)
+						.font(.system(size: 10))
+						.opacity(0.5)
+
 				}
 				.disabled(!model.canSelectProfile)
 
