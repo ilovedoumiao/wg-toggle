@@ -1,12 +1,12 @@
 <p align="center">
-    <img width="128" alt="WG Toggle Logo" src=“wg-toggle/Assets.xcassets/AppIcon.appiconset/WG Toggle-macOS-Dark-256x256@2x.png">
+    <img width="128" alt="WG Toggle Logo" src="wg-toggle/Assets.xcassets/AppIcon.appiconset/WG Toggle-macOS-Dark-256x256@2x.png">
 </p>
 
 <h1 align="center">WG Toggle</h1>
 
 <p align="center">
   <img alt="WG Toggle - A tiny unofficial menubar utility to conveniently control your wireguard-tools connection"
-       src=“ss-wg-toggle.jpg" width="640">
+       src="ss-wg-toggle.jpg" width="640">
 </p>
 
 WG Toggle is yet another tiny unofficial menubar utility to turn on or off your `wireguard-tools` connection and conveniently switch profiles.
